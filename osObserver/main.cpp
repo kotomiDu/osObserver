@@ -60,6 +60,12 @@ void setPowerThrotlling(ThreadInfo* threadInfo) {
 }
 
 void setAffinity(ThreadInfo* threadInfo, DWORD_PTR affinityMask) {
+	g_Error = !SetProcessAffinityMask(GetCurrentProcess(), affinityMask);
+	if (g_Error)
+	{
+		blog_info("ERROR! Set process affinity mask (0x%08X) failed!", affinityMask);
+	}
+	
 	g_Error = !SetThreadAffinityMask(threadInfo->hThread, affinityMask);
 	if (g_Error)
 	{
@@ -85,7 +91,9 @@ LPCWSTR GetThreadCurrentProcessorStates(ThreadInfo* threadInfo)
 	return wcResult;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+	std::string mode = argv[1];  /*small; big ; all*/
+
 	CPUDetect::InitCPUInfo(g_cpuData);
 	HANDLE mainThread = GetCurrentThread();
 	ThreadInfo	g_pInspectedThreadInfo;
@@ -93,8 +101,22 @@ int main() {
 
 	g_pInspectedThreadInfo.dwCurrentProcessor = GetCurrentProcessorNumber();
 	setPowerThrotlling(&g_pInspectedThreadInfo);
-	setAffinity(&g_pInspectedThreadInfo, g_cpuData.coreInfo.logicalProcessorMask);  //logicalProcessorMask;smallLogicalProcessorMask
-	GetThreadCurrentProcessorStates(&g_pInspectedThreadInfo);
+	if (mode == "small") {
+		setAffinity(&g_pInspectedThreadInfo, g_cpuData.coreInfo.smallLogicalProcessorMask);  //logicalProcessorMask;smallLogicalProcessorMask
+	}
+	else if (mode == "big") {
+		setAffinity(&g_pInspectedThreadInfo, g_cpuData.coreInfo.bigLogicalProcessorMask);  //logicalProcessorMask;smallLogicalProcessorMask
+	}
+	else {
+		setAffinity(&g_pInspectedThreadInfo, g_cpuData.coreInfo.logicalProcessorMask);  //logicalProcessorMask;smallLogicalProcessorMask
+	}
+	int count = 0;
+	while (true) {
+		GetThreadCurrentProcessorStates(&g_pInspectedThreadInfo);
+		count++;
+		if (count == 1000000) break;
+	}
+
 	return 0;
 }
 

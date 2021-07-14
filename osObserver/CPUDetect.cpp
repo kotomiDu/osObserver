@@ -15,6 +15,7 @@
 #include "CPUDetect.h"
 #include <intrin.h>
 #include <assert.h>
+#include "util.h"
 
 namespace CPUDetect
 {
@@ -169,12 +170,14 @@ namespace CPUDetect
 			//On Intel hybrid CPU, the value of EfficiencyClass is greater than 0 for big cores, and is 0 for small cores. 
 			if (ptr->Processor.EfficiencyClass > 0)
 			{
+				blog_info("big core");
 				numBigCores++;
 				numBigLP += count;
 				maskBigLP |= mask;
 			}
 			else
 			{
+				blog_info("small core");
 				numSmallCores++;
 				numSmallLP += count;
 				maskSmallLP |= mask;
@@ -203,7 +206,9 @@ namespace CPUDetect
 		coreInfo.logicalProcessorMask = maskLP;
 		coreInfo.bigLogicalProcessorMask = maskBigLP;
 		coreInfo.smallLogicalProcessorMask = maskSmallLP;
-
+		blog_info("ProcessorCore:%d, %d, %d", numProcessorCores, numBigCores, numSmallCores);
+		blog_info("ProcessorCount:%d, %d, %d", numLP, numBigLP, numSmallLP);
+		blog_info("ProcessorMask:(0x%016X), (0x%016X), (0x%016X)", maskLP, maskBigLP, maskSmallLP);
 		return 0;
 	}
 
