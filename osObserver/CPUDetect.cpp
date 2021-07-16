@@ -170,14 +170,12 @@ namespace CPUDetect
 			//On Intel hybrid CPU, the value of EfficiencyClass is greater than 0 for big cores, and is 0 for small cores. 
 			if (ptr->Processor.EfficiencyClass > 0)
 			{
-				blog_info("big core");
 				numBigCores++;
 				numBigLP += count;
 				maskBigLP |= mask;
 			}
 			else
 			{
-				blog_info("small core");
 				numSmallCores++;
 				numSmallLP += count;
 				maskSmallLP |= mask;
