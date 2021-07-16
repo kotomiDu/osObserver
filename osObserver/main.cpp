@@ -91,6 +91,11 @@ LPCWSTR GetThreadCurrentProcessorStates(ThreadInfo* threadInfo)
 	return wcResult;
 }
 
+void UpdateThreadInformation(ThreadInfo* threadInfo) {
+	//assert(GetThreadId(GetCurrentThread()) == threadInfo.dwID);
+	threadInfo->dwCurrentProcessor = GetCurrentProcessorNumber();
+}
+
 int main(int argc, char* argv[]) {
 	std::string mode = argv[1];  /*small; big ; all*/
 
@@ -100,21 +105,26 @@ int main(int argc, char* argv[]) {
 	InitThreadInformations(&g_pInspectedThreadInfo, &mainThread, 1);
 
 	g_pInspectedThreadInfo.dwCurrentProcessor = GetCurrentProcessorNumber();
-	setPowerThrotlling(&g_pInspectedThreadInfo);
+
 	if (mode == "small") {
 		setAffinity(&g_pInspectedThreadInfo, g_cpuData.coreInfo.smallLogicalProcessorMask);  //logicalProcessorMask;smallLogicalProcessorMask
 	}
 	else if (mode == "big") {
 		setAffinity(&g_pInspectedThreadInfo, g_cpuData.coreInfo.bigLogicalProcessorMask);  //logicalProcessorMask;smallLogicalProcessorMask
 	}
-	else {
+	else if(mode == "all"){
 		setAffinity(&g_pInspectedThreadInfo, g_cpuData.coreInfo.logicalProcessorMask);  //logicalProcessorMask;smallLogicalProcessorMask
+	}
+	else if (mode == "powerthrottle") {
+		setPowerThrotlling(&g_pInspectedThreadInfo);
 	}
 	int count = 0;
 	while (true) {
+		Sleep(1000);
+		UpdateThreadInformation(&g_pInspectedThreadInfo);
 		GetThreadCurrentProcessorStates(&g_pInspectedThreadInfo);
 		count++;
-		if (count == 1000000) break;
+		if (count == 100) break;
 	}
 
 	return 0;
