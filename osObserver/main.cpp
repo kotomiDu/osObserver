@@ -4,13 +4,12 @@
 #include "CPUDetect.h"
 #include "util.h"
 
-DWORD_PTR	g_ProcessAffinityMask = 0;
-bool		g_Error = false;
+#define EXPORT __declspec(dllexport)
 CPUDetect::CPUData g_cpuData = {};
 
-
-struct ThreadInfo
+class EXPORT ThreadInfo
 {
+public:
 	HANDLE	hThread;
 	DWORD	dwID;
 	int		iPriority;
@@ -19,48 +18,47 @@ struct ThreadInfo
 	DWORD		dwCurrentProcessor;
 	bool	bPowerThrotlling;
 	bool	bUpdated;
+
+public: 
+	ThreadInfo(HANDLE cpuThread) {
+		hThread = cpuThread;
+		dwID = GetThreadId(hThread);
+		dwAffinityMask = 0; //g_ProcessAffinityMask;
+		dwCurrentProcessor = GetCurrentProcessorNumber();
+		dwIdealProcessor = SetThreadIdealProcessor(hThread, MAXIMUM_PROCESSORS);
+		iPriority = GetThreadPriority(hThread);
+		bPowerThrotlling = false;
+		bUpdated = false;
+	}
+
+	LPCWSTR GetThreadCurrentProcessorStates()
+	{
+		static WCHAR wcResult[128] = { 0 };
+		char s[65] = {};
+
+		DWORD pn = dwCurrentProcessor;
+		for (int i = 0; i < g_cpuData.coreInfo.logicalProcessorCount; i++)
+		{
+			s[i] = (i == pn) ? '*' : '0';
+		}
+		blog_info("Thread Current Processor: %2u  [%s] ", pn, s);
+		return wcResult;
+	}
+
+	void UpdateThreadInformation() {
+		dwCurrentProcessor = GetCurrentProcessorNumber();
+	}
 };
-void InitThreadInformations(ThreadInfo threadInformations[], HANDLE threads[], size_t numThreads)
-{
-	HANDLE hThread;
-	for (int iInstance = 0; iInstance < numThreads; ++iInstance)
-	{
-		hThread = threads[iInstance];
-		threadInformations[iInstance].hThread = hThread;
-		threadInformations[iInstance].dwID = GetThreadId(hThread);
-		threadInformations[iInstance].dwAffinityMask = g_ProcessAffinityMask;
-		threadInformations[iInstance].dwIdealProcessor = SetThreadIdealProcessor(hThread, MAXIMUM_PROCESSORS);
-		threadInformations[iInstance].iPriority = GetThreadPriority(hThread);
-		threadInformations[iInstance].bPowerThrotlling = false;
-		threadInformations[iInstance].bUpdated = false;
-	}
-}
-LPCWSTR GetThreadCurrentProcessorStates(ThreadInfo* threadInfo)
-{
-	static WCHAR wcResult[128] = { 0 };
-	char s[65] = {};
 
-	DWORD pn = threadInfo->dwCurrentProcessor;
-	for (int i = 0; i < g_cpuData.coreInfo.logicalProcessorCount; i++)
-	{
-		s[i] = (i == pn) ? '*' : '0';
-	}
-	blog_info("Thread Current Processor: %2u  [%s] ", pn, s);
-	return wcResult;
-}
-void UpdateThreadInformation(ThreadInfo* threadInfo) {
-	//assert(GetThreadId(GetCurrentThread()) == threadInfo.dwID);
-	threadInfo->dwCurrentProcessor = GetCurrentProcessorNumber();
-}
 
-void setPowerThrotlling(ThreadInfo* threadInfo) {
+EXPORT void setPowerThrotlling(ThreadInfo* threadInfo) {
 	THREAD_POWER_THROTTLING_STATE PowerThrottling;
 	RtlZeroMemory(&PowerThrottling, sizeof(PowerThrottling));
 	PowerThrottling.Version = THREAD_POWER_THROTTLING_CURRENT_VERSION;
 	PowerThrottling.ControlMask = THREAD_POWER_THROTTLING_EXECUTION_SPEED;
 	PowerThrottling.StateMask = THREAD_POWER_THROTTLING_EXECUTION_SPEED;
 
-	g_Error = !SetThreadInformation(threadInfo->hThread,
+	bool g_Error = !SetThreadInformation(threadInfo->hThread,
 	ThreadPowerThrottling,
 	&PowerThrottling,
 	sizeof(PowerThrottling));
@@ -74,14 +72,8 @@ void setPowerThrotlling(ThreadInfo* threadInfo) {
 		threadInfo->bPowerThrotlling = true;
 	}
 }
-void setAffinity(ThreadInfo* threadInfo, DWORD_PTR affinityMask) {
-	g_Error = !SetProcessAffinityMask(GetCurrentProcess(), affinityMask);
-	if (g_Error)
-	{
-		blog_info("ERROR! Set process affinity mask (0x%08X) failed!", affinityMask);
-	}
-	
-	g_Error = !SetThreadAffinityMask(threadInfo->hThread, affinityMask);
+EXPORT void setAffinity(ThreadInfo* threadInfo, DWORD_PTR affinityMask) {
+	bool g_Error = !SetThreadAffinityMask(threadInfo->hThread, affinityMask);
 	if (g_Error)
 	{
 		blog_info("ERROR! Set thread affinity mask (0x%08X) failed!", affinityMask);
@@ -93,15 +85,13 @@ void setAffinity(ThreadInfo* threadInfo, DWORD_PTR affinityMask) {
 }
 
 
-
 int main(int argc, char* argv[]) {
 	std::string mode = argv[1];  /*small; big ; all*/
-	
-	HANDLE mainThread = GetCurrentThread();
-	ThreadInfo	g_pInspectedThreadInfo;
-	InitThreadInformations(&g_pInspectedThreadInfo, &mainThread, 1);
-
 	CPUDetect::InitCPUInfo(g_cpuData);
+
+	HANDLE mainThread = GetCurrentThread();
+	ThreadInfo	g_pInspectedThreadInfo(mainThread);
+
 	if (mode == "small") {
 		setAffinity(&g_pInspectedThreadInfo, g_cpuData.coreInfo.smallLogicalProcessorMask);  //logicalProcessorMask;smallLogicalProcessorMask
 	}
@@ -118,8 +108,8 @@ int main(int argc, char* argv[]) {
 	int count = 0;
 	while (true) {
 		Sleep(1000);
-		UpdateThreadInformation(&g_pInspectedThreadInfo);
-		GetThreadCurrentProcessorStates(&g_pInspectedThreadInfo);
+		g_pInspectedThreadInfo.UpdateThreadInformation();
+		g_pInspectedThreadInfo.GetThreadCurrentProcessorStates();
 		count++;
 		if (count == 100) break;
 	}
