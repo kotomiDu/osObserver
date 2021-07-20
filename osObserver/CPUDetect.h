@@ -16,9 +16,10 @@
 
 #include <windows.h>
 #include <string>
-
-namespace CPUDetect
+#define EXPORT __declspec(dllexport)
+class EXPORT CPUDetect
 {
+public:
 	struct CPUData
 	{
 		/*******************************************************************************
@@ -152,7 +153,8 @@ namespace CPUDetect
 
 		} coreInfo;
 	};
-
+public:
+	CPUData cpuData;
 	/*******************************************************************************
 	 * InitCPUInfo
 	 *
@@ -207,4 +209,38 @@ namespace CPUDetect
 	 *
 	 ******************************************************************************/
 	bool IsIntelCPU();
-}
+};
+
+class EXPORT ThreadInfo
+{
+public:
+	HANDLE	hThread;
+	DWORD	dwID;
+	int		iPriority;
+	DWORD_PTR	dwAffinityMask;
+	DWORD		dwIdealProcessor;
+	DWORD		dwCurrentProcessor;
+	bool	bPowerThrotlling;
+	bool	bUpdated;
+
+public:
+	ThreadInfo(HANDLE cpuThread) {
+		hThread = cpuThread;
+		dwID = GetThreadId(hThread);
+		dwAffinityMask = 0; //g_ProcessAffinityMask;
+		dwCurrentProcessor = GetCurrentProcessorNumber();
+		dwIdealProcessor = SetThreadIdealProcessor(hThread, MAXIMUM_PROCESSORS);
+		iPriority = GetThreadPriority(hThread);
+		bPowerThrotlling = false;
+		bUpdated = false;
+	}
+
+	LPCWSTR GetThreadCurrentProcessorStates(CPUDetect::CPUData g_cpuData);
+
+	void UpdateThreadInformation();
+};
+
+
+EXPORT void setPowerThrotlling(ThreadInfo* threadInfo);
+
+EXPORT void setAffinity(ThreadInfo* threadInfo, DWORD_PTR affinityMask);
